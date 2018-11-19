@@ -1,0 +1,14 @@
+
+*.pth
+
+result/seresnet164_cifar100/model_best\.pth\.tar
+
+data/
+
+models/__pycache__/
+
+result/seresnet164_cifar100/
+
+\.idea/
+
+*.log

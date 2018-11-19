@@ -22,10 +22,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
+from torch.distributions import Categorical
 
-from torch.autograd import Variable
 
 import math
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -71,8 +73,9 @@ class PreActBottleneck(nn.Module):
     '''Pre-activation version of the original Bottleneck module.'''
     expansion = 4
 
-    def __init__(self, in_planes, planes, stride=1):
+    def __init__(self, in_planes, planes, stride=1, idx=0):
         super(PreActBottleneck, self).__init__()
+        self.idx = idx
         self.bn1 = nn.BatchNorm2d(in_planes)
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
         self.bn2 = nn.BatchNorm2d(planes)
@@ -89,7 +92,8 @@ class PreActBottleneck(nn.Module):
         self.fc1 = nn.Conv2d(self.expansion*planes, self.expansion*planes // 16, kernel_size=1)
         self.fc2 = nn.Conv2d(self.expansion*planes // 16, self.expansion*planes, kernel_size=1)
 
-    def forward(self, x):
+    def forward(self, inp):
+        x, e_loss = inp
         out = F.relu(self.bn1(x))
         shortcut = self.shortcut(out) if hasattr(self, 'shortcut') else x
         out = self.conv1(out)
@@ -98,17 +102,21 @@ class PreActBottleneck(nn.Module):
         # Squeeze
         w = F.avg_pool2d(out, out.size(2))
         w = F.relu(self.fc1(w))
-        w = self.fc2(w)
-        # w = F.sigmoid(self.fc2(w))
+        w = F.sigmoid(self.fc2(w))
 
-        w1 = F.relu(w - 0.1)
-        w2 = -F.relu(-0.1 - w)
-        w = w1 + w2
-        w = torch.sign(w)
+        m = Categorical(probs=w.squeeze())
+        entropy = m.entropy().mean()
+        e_loss += entropy
+        # plt.figure()
+        # plt.hist(w.view(-1).detach().cpu().numpy(), 50, range=(0, 1), density=True, facecolor='g', alpha=0.75)
+        # plt.savefig('stage{}layer{}.png'.format(x.size(2) // 2, self.idx))
+
+        # w = F.relu(w - 0.1) + F.relu(w - 0.1).sign() * 0.1
+
         # Excitation
-        out = out * w.float()
+        out = out * w
         out += shortcut
-        return out
+        return out, e_loss
 
 
 class SeResNet(nn.Module):
@@ -137,21 +145,21 @@ class SeResNet(nn.Module):
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
-        for stride in strides:
-            layers.append(block(self.in_planes, planes, stride))
+        for idx, stride in enumerate(strides):
+            layers.append(block(self.in_planes, planes, stride, idx))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
     def forward(self, x):
         out = self.conv1(x)
-        out = self.stage1(out)
-        out = self.stage2(out)
-        out = self.stage3(out)
+        out, e_loss = self.stage1((out, 0))
+        out, e_loss = self.stage2((out, e_loss))
+        out, e_loss = self.stage3((out, e_loss))
         out = F.relu(self.bn(out))
         out = F.avg_pool2d(out, 8)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
-        return out
+        return out, e_loss
 
 
 def SeResNet164(num_classes=10):

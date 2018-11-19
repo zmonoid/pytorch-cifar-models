@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # for densenet
 # CUDA_VISIBLE_DEVICES=0 python main.py --epoch 300 --batch-size 64 -ct 100
 
