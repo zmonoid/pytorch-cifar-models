@@ -98,9 +98,15 @@ class PreActBottleneck(nn.Module):
         # Squeeze
         w = F.avg_pool2d(out, out.size(2))
         w = F.relu(self.fc1(w))
-        w = F.sigmoid(self.fc2(w))
+        w = self.fc2(w)
+        # w = F.sigmoid(self.fc2(w))
+
+        w1 = F.relu(w - 0.1)
+        w2 = -F.relu(-0.1 - w)
+        w = w1 + w2
+        w = torch.sign(w)
         # Excitation
-        out = out * w
+        out = out * w.float()
         out += shortcut
         return out
 
