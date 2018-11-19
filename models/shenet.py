@@ -23,7 +23,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
 
-from torch.autograd import Variable
 
 import math
 
@@ -90,7 +89,7 @@ class PreActBottleneck(nn.Module):
         # SE layers
         self.fc1 = nn.Conv2d(self.expansion*planes, self.expansion*planes // 16, kernel_size=1)
         self.fc2 = nn.Conv2d(self.expansion*planes // 16, self.expansion*planes, kernel_size=1)
-        self.bias = nn.Conv2d(self.expansion*planes // 16, self.expansion*planes, kernel_size=1)
+        # self.bias = nn.Conv2d(self.expansion*planes // 16, self.expansion*planes, kernel_size=1)
         # self.bias = nn.Parameter(torch.ones(self.expansion*planes, 1, 1) * 0.1)
 
     def forward(self, inp):
@@ -104,16 +103,17 @@ class PreActBottleneck(nn.Module):
         # Squeeze
         w = F.avg_pool2d(out, out.size(2))
         w = F.relu(self.fc1(w))
-        bias = self.bias(w)
 
-        w = F.sigmoid(self.fc2(w))
-        entropy = 0 - (w * w.log()).sum()
+        w = F.softsign(self.fc2(w))
+        # entropy = 0 - (w * w.log()).sum()
+        entropy = 0
         pe += entropy * 0.001
         # w = F.relu(w - self.bias.abs())
-        w = F.relu(w - bias.clamp(-0.2, 0.2).abs())
-        wx = w.squeeze().cpu().numpy()
-        info = '{} {} {}'.format(wx.shape[0] * wx.shape[1], (wx > 0).sum(), (wx > 0).sum() / (wx.shape[0] * wx.shape[1]))
-        print(info)
+        # w = F.relu(w - 0.1)
+        # w = F.sign
+        # wx = w.squeeze().cpu().numpy()
+        # info = '{} {} {}'.format(wx.shape[0] * wx.shape[1], (wx > 0).sum(), (wx > 0).sum() / (wx.shape[0] * wx.shape[1]))
+        # print(info)
         # Excitation
         out = out * w
         out += shortcut
