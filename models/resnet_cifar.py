@@ -290,11 +290,6 @@ def resnet110_cifar(**kwargs):
     return model
 
 
-def resnet1202_cifar(**kwargs):
-    model = ResNet_Cifar(BasicBlock, [200, 200, 200], **kwargs)
-    return model
-
-
 def resnet164_cifar(**kwargs):
     model = ResNet_Cifar(Bottleneck, [18, 18, 18], **kwargs)
     return model

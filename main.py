@@ -14,6 +14,8 @@ import torchvision
 import torchvision.transforms as transforms
 
 from models import *
+import logging
+import pdb
 
 
 parser = argparse.ArgumentParser(description='PyTorch Cifar10 Training')
@@ -22,17 +24,37 @@ parser.add_argument('--start-epoch', default=0, type=int, metavar='N', help='man
 parser.add_argument('-b', '--batch-size', default=128, type=int, metavar='N', help='mini-batch size (default: 128),only used for train')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float, metavar='LR', help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
+parser.add_argument('--arch', default="seresnet", type=str, help='momentum')
 parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float, metavar='W', help='weight decay (default: 1e-4)')
 parser.add_argument('--print-freq', '-p', default=10, type=int, metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH', help='path to latest checkpoint (default: none)')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
 parser.add_argument('-ct', '--cifar-type', default='10', type=int, metavar='CT', help='10 for cifar10,100 for cifar100 (default: 10)')
 
+args = parser.parse_args()
 best_prec = 0
+# create logger with 'spam_application'
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+# create file handler which logs even debug messages
+fh = logging.FileHandler('{}.log'.format(args.arch))
+fh.setLevel(logging.DEBUG)
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+# create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(message)s')
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+# add the handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
+
+def fprint(info):
+    logger.info(info)
 
 def main():
     global args, best_prec
-    args = parser.parse_args()
     use_gpu = torch.cuda.is_available()
 
     # Model building
@@ -41,31 +63,47 @@ def main():
         # model can be set to anyone that I have defined in models folder
         # note the model should match to the cifar type !
 
-        model = resnet20_cifar()
+        # model = resnet20_cifar()
         # model = resnet32_cifar()
         # model = resnet44_cifar()
-        # model = resnet110_cifar()
-        # model = preact_resnet110_cifar()
+        # model = resnet110_cifar(num_classes=100)
         # model = resnet164_cifar(num_classes=100)
         # model = resnet1001_cifar(num_classes=100)
+        # model = preact_resnet110_cifar(num_classes=100)
         # model = preact_resnet164_cifar(num_classes=100)
         # model = preact_resnet1001_cifar(num_classes=100)
+
+        # model = SeResNet164(num_classes=100)
+        # model = SHeResNet164(num_classes=100)
+
+        if args.arch == 'resnet164_cifar100':
+            model = resnet164_cifar(num_classes=100)
+        elif args.arch == 'preactresnet164_cifar100':
+            model = preact_resnet164_cifar(num_classes=100)
+        elif args.arch == 'seresnet164_cifar100':
+            model = SeResNet164(num_classes=100)
+        elif args.arch.startswith('sheresnet164_cifar100'):
+            model = SHeResNet164(num_classes=100)
+        else:
+            raise ValueError("No such model")
+
+
 
         # model = wide_resnet_cifar(depth=26, width=10, num_classes=100)
 
         # model = resneXt_cifar(depth=29, cardinality=16, baseWidth=64, num_classes=100)
-        
-        #model = densenet_BC_cifar(depth=190, k=40, num_classes=100)
+
+        # model = densenet_BC_cifar(depth=190, k=40, num_classes=100)
 
         # mkdir a new folder to store the checkpoint and best model
         if not os.path.exists('result'):
             os.makedirs('result')
-        fdir = 'result/resnet20_cifar10'
+        fdir = 'result/{}'.format(args.arch)
         if not os.path.exists(fdir):
             os.makedirs(fdir)
 
         # adjust the lr according to the model type
-        if isinstance(model, (ResNet_Cifar, PreAct_ResNet_Cifar)):
+        if isinstance(model, (ResNet_Cifar, PreAct_ResNet_Cifar, SeResNet, SHeResNet)):
             model_type = 1
         elif isinstance(model, Wide_ResNet_Cifar):
             model_type = 2
@@ -102,8 +140,8 @@ def main():
         normalize = transforms.Normalize(mean=[0.491, 0.482, 0.447], std=[0.247, 0.243, 0.262])
 
         train_dataset = torchvision.datasets.CIFAR10(
-            root='./data', 
-            train=True, 
+            root='./data',
+            train=True,
             download=True,
             transform=transforms.Compose([
                 transforms.RandomCrop(32, padding=4),
@@ -157,7 +195,7 @@ def main():
         adjust_learning_rate(optimizer, epoch, model_type)
 
         # train for one epoch
-        train(trainloader, model, criterion, optimizer, epoch)
+        # train(trainloader, model, criterion, optimizer, epoch)
 
         # evaluate on test set
         prec = validate(testloader, model, criterion)
@@ -207,8 +245,9 @@ def train(trainloader, model, criterion, optimizer, epoch):
         input, target = input.cuda(), target.cuda()
 
         # compute output
-        output = model(input)
+        output, pe = model(input)
         loss = criterion(output, target)
+        loss += pe.sum() * 0.01
 
         # measure accuracy and record loss
         prec = accuracy(output, target)[0]
@@ -225,13 +264,14 @@ def train(trainloader, model, criterion, optimizer, epoch):
         end = time.time()
 
         if i % args.print_freq == 0:
-            print('Epoch: [{0}][{1}/{2}]\t'
+            fprint('Epoch: [{0}][{1}/{2}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                  'Entropy {en:.4f}\t'
                   'Prec {top1.val:.3f}% ({top1.avg:.3f}%)'.format(
                    epoch, i, len(trainloader), batch_time=batch_time,
-                   data_time=data_time, loss=losses, top1=top1))
+                   data_time=data_time, loss=losses, top1=top1, en=pe.sum().item()))
 
 
 def validate(val_loader, model, criterion):
@@ -248,8 +288,10 @@ def validate(val_loader, model, criterion):
             input, target = input.cuda(), target.cuda()
 
             # compute output
-            output = model(input)
+            output, pe = model(input)
             loss = criterion(output, target)
+            import pdb
+            pdb.set_trace()
 
             # measure accuracy and record loss
             prec = accuracy(output, target)[0]
@@ -261,14 +303,14 @@ def validate(val_loader, model, criterion):
             end = time.time()
 
             if i % args.print_freq == 0:
-                print('Test: [{0}/{1}]\t'
+                fprint('Test: [{0}/{1}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                   'Prec {top1.val:.3f}% ({top1.avg:.3f}%)'.format(
                    i, len(val_loader), batch_time=batch_time, loss=losses,
                    top1=top1))
 
-    print(' * Prec {top1.avg:.3f}% '.format(top1=top1))
+    fprint(' * Prec {top1.avg:.3f}% '.format(top1=top1))
 
     return top1.avg
 
