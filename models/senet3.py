@@ -92,6 +92,7 @@ class PreActBottleneck(nn.Module):
         self.fc1 = nn.Conv2d(self.expansion*planes, self.expansion*planes // 16, kernel_size=1)
         self.fc2 = nn.Conv2d(self.expansion*planes // 16, self.expansion*planes, kernel_size=1)
 
+
     def forward(self, inp):
         x, e_loss = inp
         out = F.relu(self.bn1(x))
@@ -107,6 +108,8 @@ class PreActBottleneck(nn.Module):
         m = Categorical(probs=w.squeeze())
         entropy = m.entropy().mean()
         e_loss += entropy
+
+        w = F.relu(w - 0.1) + 0.1 * F.relu(w - 0.1).sign()
         # plt.figure()
         # plt.hist(w.view(-1).detach().cpu().numpy(), 50, range=(0, 1), density=True, facecolor='g', alpha=0.75)
         # plt.savefig('stage{}layer{}.png'.format(x.size(2) // 2, self.idx))

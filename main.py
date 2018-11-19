@@ -76,14 +76,12 @@ def main():
         # model = SeResNet164(num_classes=100)
         # model = SHeResNet164(num_classes=100)
 
-        if args.arch == 'resnet164_cifar100':
+        if args.arch.startswith('resnet164_cifar100'):
             model = resnet164_cifar(num_classes=100)
-        elif args.arch == 'preactresnet164_cifar100':
+        elif args.arch.startswith('preactresnet164_cifar100'):
             model = preact_resnet164_cifar(num_classes=100)
-        elif args.arch == 'seresnet164_cifar100':
+        elif args.arch.startswith('seresnet164_cifar100'):
             model = SeResNet164(num_classes=100)
-        elif args.arch.startswith('sheresnet164_cifar100'):
-            model = SHeResNet164(num_classes=100)
         else:
             raise ValueError("No such model")
 
@@ -103,7 +101,7 @@ def main():
             os.makedirs(fdir)
 
         # adjust the lr according to the model type
-        if isinstance(model, (ResNet_Cifar, PreAct_ResNet_Cifar, SeResNet, SHeResNet)):
+        if isinstance(model, (ResNet_Cifar, PreAct_ResNet_Cifar, SeResNet)):
             model_type = 1
         elif isinstance(model, Wide_ResNet_Cifar):
             model_type = 2
@@ -195,7 +193,7 @@ def main():
         adjust_learning_rate(optimizer, epoch, model_type)
 
         # train for one epoch
-        # train(trainloader, model, criterion, optimizer, epoch)
+        train(trainloader, model, criterion, optimizer, epoch)
 
         # evaluate on test set
         prec = validate(testloader, model, criterion)
@@ -245,9 +243,9 @@ def train(trainloader, model, criterion, optimizer, epoch):
         input, target = input.cuda(), target.cuda()
 
         # compute output
-        output, pe = model(input)
+        output, e_loss = model(input)
         loss = criterion(output, target)
-        loss += pe.sum() * 0.01
+        loss += e_loss
 
         # measure accuracy and record loss
         prec = accuracy(output, target)[0]
@@ -271,7 +269,7 @@ def train(trainloader, model, criterion, optimizer, epoch):
                   'Entropy {en:.4f}\t'
                   'Prec {top1.val:.3f}% ({top1.avg:.3f}%)'.format(
                    epoch, i, len(trainloader), batch_time=batch_time,
-                   data_time=data_time, loss=losses, top1=top1, en=pe.sum().item()))
+                   data_time=data_time, loss=losses, top1=top1, en=e_loss.item()))
 
 
 def validate(val_loader, model, criterion):
@@ -288,10 +286,8 @@ def validate(val_loader, model, criterion):
             input, target = input.cuda(), target.cuda()
 
             # compute output
-            output, pe = model(input)
+            output, e_loss = model(input)
             loss = criterion(output, target)
-            import pdb
-            pdb.set_trace()
 
             # measure accuracy and record loss
             prec = accuracy(output, target)[0]

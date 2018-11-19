@@ -25,7 +25,7 @@ class _DenseLayer(nn.Sequential):
                         kernel_size=3, stride=1, padding=1, bias=False)),
         self.drop_rate = drop_rate
 
-
+        
 
     def forward(self, x):
         new_features = super(_DenseLayer, self).forward(x)
