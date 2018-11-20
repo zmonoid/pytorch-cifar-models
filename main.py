@@ -245,7 +245,7 @@ def train(trainloader, model, criterion, optimizer, epoch):
         # compute output
         output, e_loss = model(input)
         loss = criterion(output, target)
-        loss += e_loss
+        # loss += e_loss
 
         # measure accuracy and record loss
         prec = accuracy(output, target)[0]
