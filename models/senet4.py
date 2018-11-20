@@ -105,10 +105,8 @@ class PreActBottleneck(nn.Module):
         z = torch.cat((out, shortcut), dim=1)
         w = F.avg_pool2d(z, z.size(2))
         w = F.relu(self.fc1(w))
-        w = self.fc2(w)
+        w = F.sigmoid(self.fc2(w))
         w1, w2 = torch.split(w, out.size(1), dim=1)
-        w1 = F.sigmoid(w1)
-        w2 = F.sigmoid(w2)
 
         e_loss = torch.randn(1)
         # m = Categorical(probs=w.squeeze())
