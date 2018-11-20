@@ -90,7 +90,7 @@ class PreActBottleneck(nn.Module):
 
         # SE layers
         self.fc1 = nn.Conv2d(self.expansion*planes * 2, self.expansion*planes * 2 // 16, kernel_size=1)
-        self.fc2 = nn.Conv2d(self.expansion*planes * 2 // 16, self.expansion*planes * 2, kernel_size=1)
+        self.fc2 = nn.Conv2d(self.expansion*planes * 2 // 16, 2, kernel_size=1)
 
 
     def forward(self, inp):
@@ -106,7 +106,7 @@ class PreActBottleneck(nn.Module):
         w = F.avg_pool2d(z, z.size(2))
         w = F.relu(self.fc1(w))
         w = F.sigmoid(self.fc2(w))
-        w1, w2 = torch.split(w, out.size(1), dim=1)
+        w1, w2 = torch.split(w, [1, 1], dim=1)
 
         e_loss = torch.randn(1)
         # m = Categorical(probs=w.squeeze())
