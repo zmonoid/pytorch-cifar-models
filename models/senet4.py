@@ -107,7 +107,7 @@ class PreActBottleneck(nn.Module):
         w = F.relu(self.fc1(w))
         w = F.sigmoid(self.fc2(w))
         w1, w2 = torch.split(w, [1, 1], dim=1)
-
+        print(w.size(), w1.size(), w2.size())
         e_loss = torch.randn(1)
         # m = Categorical(probs=w.squeeze())
         # entropy = m.entropy().mean()
